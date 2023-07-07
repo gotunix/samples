@@ -1,0 +1,64 @@
+##############################################################################
+# Demo workflow yaml file
+#############################################################################W
+workflow:
+  variables:
+    image: 'services/registry'
+    registry: 'registry-internal.gotunixcode.net:5000'
+    container_name: 'registry'
+    environment: 'prod'
+    url: 'registry.gotunixcode.net'
+    build_numner: 'latest'
+    volume_01: '/data/registry'
+    volume_01_mount: '/data'
+  stages:
+    - stage: Build
+      displayName: Build container image
+      tasks:
+        - task: Git
+          displayName: Update git repository
+          module: modules.git
+          arguments:
+            repo: https://www.github.com/repo.git
+
+        - task: Docker
+          displayName: Build container from Dockerfile
+          module: modules.docker
+          arguments:
+            dockerFile: cicd/Dockerfile
+            image: ${IMAGE}
+            registry: ${REGISTRY}
+
+        - task: Docker
+          displayName: Push container to internal Registry
+          module: modules.docker
+          arguments:
+            image: ${IMAGE}
+            registry: ${REGISTRY}
+
+    - stage: Deployment
+      displayName: Deploy Docker container
+      tasks:
+        - task: Git
+          displayName: Update git repo
+          module: modules.git
+          arguments:
+            repo: https://www.github.com/repo.git
+
+        - task: EnvSubSt
+          displayName: Generate docker-compose.yml
+          module: modules.envsubst
+          arguments:
+            composeFile: 'cicd/docker-compose.yml'
+
+        - task: Docker
+          displayName: Deploy stack using docker-compose.yml
+          module: modules.docker
+          arguments:
+            image: ${IMAGE}
+            registry: ${REGISTRY}
+            tlsauth: True,
+            tlscacert: '~/.docker/certs/onprem/ca.pem'
+            tlscert: '~/.docker/certs/onprem/client-cert.pem'
+            tlskey: '~/.docker/certs/onprem/client-key.pem'
+            dockerHost: '192.168.0.2:2376'
